@@ -9,7 +9,15 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const headers = new Headers(options.headers);
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfToken) headers.set("X-CSRF-Token", csrfToken);
-  const response = await fetch(`${baseUrl}${path}`, { ...options, headers, credentials: "include" });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, { ...options, headers, credentials: "include" });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(0, "Cannot reach the API server. Start it with `npm run dev` from the project root, then try again.", "API_UNAVAILABLE");
+    }
+    throw error;
+  }
   if (response.status === 204) return undefined as T;
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApiError(response.status, payload.error || "The request could not be completed", payload.code);
