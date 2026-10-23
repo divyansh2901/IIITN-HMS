@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  LEFT
+}
+
+enum RoomType {
+  DOUBLE
+  FOUR_SEATER
+}
+
+enum RoomOperationalStatus {
+  AVAILABLE
+  MAINTENANCE
+  UNAVAILABLE
+}
+
+enum AllocationStatus {
+  ACTIVE
+  VACATED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DEPARTED
+  RETURNED
+  CANCELLED
+}
+
+enum LeaveEventType {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  DEPARTURE_VERIFIED
+  RETURN_VERIFIED
+  CANCELLED
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ComplaintPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum EquipmentIssueStatus {
+  ISSUED
+  RETURNED
+  LOST
+  CANCELLED
+}
+
+enum EquipmentCondition {
+  GOOD
+  FAIR
+  DAMAGED
+  UNUSABLE
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique @db.VarChar(320)
+  passwordHash String        @db.VarChar(255)
+  fullName     String        @db.VarChar(160)
+  phone        String?       @db.VarChar(30)
+  status       AccountStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  roles              UserRole[]
+  student            Student?
+  staff              Staff?
+  approvedLeaves     LeaveRequest[] @relation("LeaveApprover")
+  applicationReviews HostelApplication[] @relation("ApplicationReviewer")
+  createdAllocations RoomAllocation[] @relation("AllocationActor")
+  assignedComplaints Complaint[]    @relation("ComplaintAssignee")
+  leaveEvents        LeaveEvent[]
+  complaintHistory   ComplaintHistory[]
+  equipmentIssues    EquipmentIssue[] @relation("IssueStaff")
+  notices            Notice[] @relation("NoticeAuthor")
+  policyUpdates      PolicySetting[] @relation("PolicyUpdater")
+  auditLogs          AuditLog[]
+}
+
+model Role {
+  id          String     @id @default(uuid()) @db.Uuid
+  code        String     @unique @db.VarChar(40)
+  description String?    @db.VarChar(255)
+  users       UserRole[]
+}
+
+model UserRole {
+  userId String @db.Uuid
+  roleId String @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model Student {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @unique @db.Uuid
+  enrollmentNumber String       @unique @db.VarChar(32)
+  admissionBatch  Int
+  branchCode      String        @db.VarChar(12)
+  academicYear    Int?
+  status          StudentStatus @default(ACTIVE)
+  guardianName    String?       @db.VarChar(160)
+  guardianPhone   String?       @db.VarChar(30)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  allocations  RoomAllocation[]
+  applications HostelApplication[]
+  leaveRequests LeaveRequest[]
+  complaints   Complaint[]
+  equipmentIssues EquipmentIssue[]
+
+  @@index([branchCode, admissionBatch])
+  @@index([status])
+}
+
+model Staff {
+  id          String  @id @default(uuid()) @db.Uuid
+  userId      String  @unique @db.Uuid
+  designation String? @db.VarChar(120)
+  department  String? @db.VarChar(120)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model Session {
+  sid    String   @id @db.VarChar(255)
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire])
+  @@map("user_sessions")
+}
+
+model Floor {
+  id          String   @id @default(uuid()) @db.Uuid
+  number      Int      @unique
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  rooms Room[]
+}
+
+model Room {
+  id              String                @id @default(uuid()) @db.Uuid
+  floorId         String                @db.Uuid
+  roomNumber      String                @db.VarChar(20)
+  roomType        RoomType
+  capacity        Int
+  operationalStatus RoomOperationalStatus @default(AVAILABLE)
+  notes           String?               @db.Text
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
+
+  floor       Floor            @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  allocations RoomAllocation[]
+  complaints  Complaint[]
+
+  @@unique([floorId, roomNumber])
+  @@index([floorId, operationalStatus])
+}
+
+model RoomAllocation {
+  id          String           @id @default(uuid()) @db.Uuid
+  studentId   String           @db.Uuid
+  roomId      String           @db.Uuid
+  allocatedBy String           @db.Uuid
+  status      AllocationStatus @default(ACTIVE)
+  allocatedAt DateTime         @default(now()) @db.Timestamptz(3)
+  vacatedAt   DateTime?        @db.Timestamptz(3)
+  reason      String?          @db.Text
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  actor   User    @relation("AllocationActor", fields: [allocatedBy], references: [id], onDelete: Restrict)
+
+  @@index([studentId, status])
+  @@index([roomId, status])
+  @@index([allocatedAt])
+}
+
+model HostelApplication {
+  id          String            @id @default(uuid()) @db.Uuid
+  studentId   String            @db.Uuid
+  submittedAt DateTime          @default(now()) @db.Timestamptz(3)
+  status      ApplicationStatus @default(SUBMITTED)
+  reviewedBy  String?           @db.Uuid
+  reviewedAt  DateTime?         @db.Timestamptz(3)
+  reviewNote  String?           @db.Text
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("ApplicationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@unique([studentId])
+  @@index([status, submittedAt])
+}
+
+model LeaveRequest {
+  id             String      @id @default(uuid()) @db.Uuid
+  studentId      String      @db.Uuid
+  departureAt    DateTime    @db.Timestamptz(3)
+  expectedReturnAt DateTime  @db.Timestamptz(3)
+  destination    String      @db.VarChar(255)
+  reason         String      @db.Text
+  additionalInfo String?     @db.Text
+  status         LeaveStatus @default(PENDING)
+  approverId     String?     @db.Uuid
+  approvedAt     DateTime?   @db.Timestamptz(3)
+  approverRemark String?     @db.Text
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
+
+  student  Student     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  approver User?       @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  events   LeaveEvent[]
+
+  @@index([studentId, createdAt])
+  @@index([status, departureAt])
+}
+
+model LeaveEvent {
+  id        String         @id @default(uuid()) @db.Uuid
+  leaveId   String         @db.Uuid
+  actorId   String         @db.Uuid
+  type      LeaveEventType
+  note      String?        @db.Text
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+
+  leave LeaveRequest @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+  actor User         @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([leaveId, createdAt])
+}
+
+model ComplaintCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(80)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  complaints Complaint[]
+}
+
+model Complaint {
+  id          String           @id @default(uuid()) @db.Uuid
+  studentId   String           @db.Uuid
+  categoryId  String           @db.Uuid
+  roomId      String?          @db.Uuid
+  description String           @db.Text
+  priority    ComplaintPriority @default(MEDIUM)
+  status      ComplaintStatus  @default(SUBMITTED)
+  assigneeId  String?          @db.Uuid
+  resolution  String?          @db.Text
+  resolvedAt  DateTime?        @db.Timestamptz(3)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+
+  student  Student           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  category ComplaintCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  room     Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  assignee User?             @relation("ComplaintAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  history ComplaintHistory[]
+
+  @@index([studentId, createdAt])
+  @@index([status, priority])
+  @@index([assigneeId, status])
+}
+
+model ComplaintHistory {
+  id          String          @id @default(uuid()) @db.Uuid
+  complaintId String          @db.Uuid
+  actorId     String          @db.Uuid
+  fromStatus  ComplaintStatus?
+  toStatus    ComplaintStatus
+  remark      String?         @db.Text
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  actor     User      @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([complaintId, createdAt])
+}
+
+model Equipment {
+  id             String            @id @default(uuid()) @db.Uuid
+  name           String            @unique @db.VarChar(120)
+  totalQuantity  Int
+  availableQuantity Int
+  condition      EquipmentCondition @default(GOOD)
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
+
+  issues EquipmentIssue[]
+}
+
+model EquipmentIssue {
+  id             String              @id @default(uuid()) @db.Uuid
+  equipmentId    String              @db.Uuid
+  studentId      String              @db.Uuid
+  staffId        String              @db.Uuid
+  quantity       Int
+  issuedAt       DateTime            @default(now()) @db.Timestamptz(3)
+  expectedReturnAt DateTime?         @db.Timestamptz(3)
+  returnedAt     DateTime?           @db.Timestamptz(3)
+  status         EquipmentIssueStatus @default(ISSUED)
+  returnCondition EquipmentCondition?
+  notes          String?             @db.Text
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  staff     User      @relation("IssueStaff", fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@index([studentId, status])
+  @@index([equipmentId, status])
+}
+
+model Notice {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(200)
+  body        String   @db.Text
+  isPublished Boolean  @default(false)
+  publishedAt DateTime? @db.Timestamptz(3)
+  authorId    String   @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  author User @relation("NoticeAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([isPublished, publishedAt])
+}
+
+model PolicySetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(80)
+  value       String   @db.VarChar(255)
+  description String?  @db.Text
+  updatedBy   String?  @db.Uuid
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  updater User? @relation("PolicyUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(80)
+  entityId   String   @db.VarChar(80)
+  metadata   Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}

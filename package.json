@@ -1,0 +1,27 @@
+{
+  "name": "iiitn-hms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "IIIT Nagpur Hostel Management System",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace @iiitn-hms/api\" \"npm run dev --workspace @iiitn-hms/web\"",
+    "build": "npm run build --workspace @iiitn-hms/api && npm run build --workspace @iiitn-hms/web",
+    "typecheck": "npm run typecheck --workspace @iiitn-hms/api && npm run typecheck --workspace @iiitn-hms/web",
+    "lint": "npm run lint --workspace @iiitn-hms/api && npm run lint --workspace @iiitn-hms/web",
+    "test": "npm run test --workspace @iiitn-hms/api",
+    "test:e2e": "npm run test:e2e --workspace @iiitn-hms/web",
+    "db:generate": "npm run db:generate --workspace @iiitn-hms/api",
+    "db:migrate": "npm run db:migrate --workspace @iiitn-hms/api",
+    "db:seed": "npm run db:seed --workspace @iiitn-hms/api"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.0",
+    "concurrently": "^9.1.2"
+  }
+}

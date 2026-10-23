@@ -1,0 +1,9 @@
+export type Role = "STUDENT" | "WARDEN" | "GUARD" | "STAFF" | "SUPER_ADMIN";
+export type User = { id: string; email: string; fullName: string; phone?: string | null; roles: Role[]; studentId?: string; staffId?: string };
+export type Room = { id: string; roomNumber: string; roomType: "DOUBLE" | "FOUR_SEATER"; capacity: number; operationalStatus: "AVAILABLE" | "MAINTENANCE" | "UNAVAILABLE"; occupied: number; available: number; floor: { number: number; name: string }; allocations: { id: string; student: { user: { fullName: string }; enrollmentNumber: string } }[] };
+export type Student = { id: string; enrollmentNumber: string; branchCode: string; admissionBatch: number; academicYear?: number | null; status: string; user: { fullName: string; email: string; phone?: string | null }; allocations: { room: { roomNumber: string; floor: { number: number; name: string } } }[] };
+export type LeaveRequest = { id: string; departureAt: string; expectedReturnAt: string; destination: string; reason: string; status: string; approverRemark?: string | null; events: { type: string; note?: string | null; createdAt: string }[] };
+export type Complaint = { id: string; description: string; priority: string; status: string; createdAt: string; category: { name: string }; resolution?: string | null };
+export type Equipment = { id: string; name: string; totalQuantity: number; availableQuantity: number; condition: string };
+export type EquipmentIssue = { id: string; quantity: number; status: string; issuedAt: string; returnedAt?: string | null; equipment: Equipment; student?: { user: { fullName: string } }; staff?: { fullName: string } };
+export type Notice = { id: string; title: string; body: string; publishedAt?: string | null; isPublished: boolean; author?: { fullName: string } };

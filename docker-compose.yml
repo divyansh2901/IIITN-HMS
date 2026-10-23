@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: iiitn-hms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hms
+      POSTGRES_PASSWORD: hms
+      POSTGRES_DB: iiitn_hms
+    ports:
+      - "5432:5432"
+    volumes:
+      - iiitn_hms_postgres:/var/lib/postgresql/data
+
+volumes:
+  iiitn_hms_postgres:
