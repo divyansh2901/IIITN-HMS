@@ -52,6 +52,25 @@ Warden and super-admin users can read paginated authorized events at `GET /audit
 
 ## Equipment and notices
 
-`GET /equipment` lists active inventory. Students use `/equipment/mine`; guards, staff, wardens, and super admins use `/equipment/issues`, `POST /equipment/issues`, and `POST /equipment/issues/:id/return`. Issue and return operations lock the inventory row and update quantities transactionally.
+`GET /equipment` lists active inventory. Students use `/equipment/mine`. **Only `GUARD` users** can use `/equipment/issues`, `/equipment/issues/outstanding`, `/equipment/issues/student/:studentId`, `POST /equipment/issues`, and `POST /equipment/issues/:id/returns` (the singular `/return` route remains a compatibility alias). Issues require a due date, have a unique transaction reference, and support partial returns through `EquipmentReturn` history. Issue and return operations lock the inventory and issue rows and update quantities transactionally.
 
 `GET /notices` lists published notices. Wardens and super admins can use `/notices/manage`, `POST /notices`, and `PATCH /notices/:id/publish`.
+
+## Requests and notifications
+
+Request types are returned by `GET /requests/types`. Students submit with `POST /requests`, list their own records with `GET /requests/my`, and may retrieve an authorized detail with `GET /requests/:id`.
+
+The request workflow is enforced server-side:
+
+```text
+PENDING_GUARD_REVIEW
+  ├── FORWARDED_TO_ADMIN → IN_PROGRESS → COMPLETED
+  │                         └──────────→ REJECTED_BY_ADMIN
+  └── REJECTED_BY_GUARD
+```
+
+Guards use `GET /requests/guard/pending`, `POST /requests/guard/:id/approve-forward`, and `POST /requests/guard/:id/reject`. Wardens and super admins use `GET /requests/admin/pending`, `POST /requests/admin/:id/start`, `POST /requests/admin/:id/complete`, and `POST /requests/admin/:id/reject`. Every transition writes `RequestHistory`, an audit record, and a student notification.
+
+Guards can search active students for equipment with `GET /students/search?q=BT25CSH&limit=10`. The endpoint returns only ID, enrollment number, branch, and display name; empty/short searches return no full-database result.
+
+`GET /notifications` returns only the authenticated user's notifications. Use `PATCH /notifications/:id/read` or `PATCH /notifications/read-all` to update read state. The API server runs an idempotent overdue-equipment check at startup and once per minute; overdue notifications use a unique `equipment-overdue:<issueId>` deduplication key.

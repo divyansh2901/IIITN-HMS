@@ -71,6 +71,9 @@ npm run db:seed      # Insert synthetic development records
 - Room allocations are stored as history, active occupancy is derived from active allocation rows, and allocation uses a serializable transaction plus a row lock and unique active-student index.
 - Student leave submissions, warden approval/rejection, guard departure/return verification, event history, and configurable `HOSTEL_IN_TIME = 22:00` seed policy.
 - Separate hostel application submission/review records with duplicate prevention and deterministic submission ordering; application records are intentionally not room allocations.
+- Generic student request workflow: student submission → guard approval/forward or rejection → administrator processing/completion or rejection, with persisted timeline history and student notifications.
+- Guard-only equipment desk with enrollment autocomplete, required due dates, unique issue references, partial returns, return history, and server-side inventory checks.
+- Persisted notification centre and idempotent minute-based overdue-equipment notification job.
 - Configurable complaint categories, student submission, staff queue, assignment field, enforced lifecycle transitions, resolution history, and audit events.
 - Equipment availability, transactional issue/return, condition tracking, duplicate-return rejection, outstanding issue history, and guard/staff workflow.
 - Published notices and administrator notice management.
@@ -87,6 +90,7 @@ This is the first implementation, not a production deployment. The following are
 - Production email/notifications, SSO, Pravesh integration, and institutional data import.
 - More granular permission records beyond role checks.
 - Browser end-to-end scenarios against a dedicated seeded test database.
+- Full PostgreSQL-backed integration coverage for every request and equipment transaction; the current environment has not provided a working PostgreSQL service.
 
 The current code keeps those boundaries extensible rather than inventing integrations or policy rules. Student academic year is stored separately from the physical room allocation; usual floor arrangements are descriptions, not allocation constraints.
 

@@ -78,6 +78,7 @@ enum ComplaintPriority {
 
 enum EquipmentIssueStatus {
   ISSUED
+  PARTIALLY_RETURNED
   RETURNED
   LOST
   CANCELLED
@@ -88,6 +89,30 @@ enum EquipmentCondition {
   FAIR
   DAMAGED
   UNUSABLE
+}
+
+enum HostelRequestStatus {
+  PENDING_GUARD_REVIEW
+  REJECTED_BY_GUARD
+  FORWARDED_TO_ADMIN
+  IN_PROGRESS
+  COMPLETED
+  REJECTED_BY_ADMIN
+}
+
+enum RequestHistoryAction {
+  SUBMITTED
+  GUARD_APPROVED_AND_FORWARDED
+  GUARD_REJECTED
+  ADMIN_STARTED
+  ADMIN_COMPLETED
+  ADMIN_REJECTED
+}
+
+enum NotificationType {
+  REQUEST_STATUS
+  EQUIPMENT_OVERDUE
+  SYSTEM
 }
 
 model User {
@@ -112,6 +137,11 @@ model User {
   equipmentIssues    EquipmentIssue[] @relation("IssueStaff")
   notices            Notice[] @relation("NoticeAuthor")
   policyUpdates      PolicySetting[] @relation("PolicyUpdater")
+  guardReviews       HostelRequest[] @relation("RequestGuardReviewer")
+  adminActions       HostelRequest[] @relation("RequestAdminActor")
+  requestHistory     RequestHistory[]
+  notifications      Notification[]
+  equipmentReturns   EquipmentReturn[] @relation("ReturnReceiver")
   auditLogs          AuditLog[]
 }
 
@@ -152,6 +182,7 @@ model Student {
   leaveRequests LeaveRequest[]
   complaints   Complaint[]
   equipmentIssues EquipmentIssue[]
+  requests       HostelRequest[] @relation("RequestStudent")
 
   @@index([branchCode, admissionBatch])
   @@index([status])
@@ -346,19 +377,118 @@ model EquipmentIssue {
   studentId      String              @db.Uuid
   staffId        String              @db.Uuid
   quantity       Int
+  quantityReturned Int                 @default(0)
   issuedAt       DateTime            @default(now()) @db.Timestamptz(3)
-  expectedReturnAt DateTime?         @db.Timestamptz(3)
+  expectedReturnAt DateTime           @db.Timestamptz(3)
   returnedAt     DateTime?           @db.Timestamptz(3)
   status         EquipmentIssueStatus @default(ISSUED)
   returnCondition EquipmentCondition?
+  transactionReference String          @unique @db.VarChar(40)
+  idempotencyKey  String?             @unique @db.VarChar(100)
   notes          String?             @db.Text
 
   equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
   staff     User      @relation("IssueStaff", fields: [staffId], references: [id], onDelete: Restrict)
+  returns   EquipmentReturn[]
 
   @@index([studentId, status])
   @@index([equipmentId, status])
+  @@index([expectedReturnAt, status])
+}
+
+model EquipmentReturn {
+  id             String              @id @default(uuid()) @db.Uuid
+  issueId        String              @db.Uuid
+  quantity       Int
+  returnedAt     DateTime            @default(now()) @db.Timestamptz(3)
+  receivedBy     String              @db.Uuid
+  condition      EquipmentCondition
+  idempotencyKey String?             @unique @db.VarChar(100)
+  notes          String?             @db.Text
+
+  issue      EquipmentIssue @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  receiver   User           @relation("ReturnReceiver", fields: [receivedBy], references: [id], onDelete: Restrict)
+
+  @@index([issueId, returnedAt])
+}
+
+model RequestType {
+  id                   String   @id @default(uuid()) @db.Uuid
+  code                 String   @unique @db.VarChar(60)
+  name                 String   @db.VarChar(120)
+  requiresLeaveDetails Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+
+  requests HostelRequest[]
+}
+
+model HostelRequest {
+  id                    String              @id @default(uuid()) @db.Uuid
+  referenceNumber       String              @unique @db.VarChar(32)
+  studentId             String              @db.Uuid
+  requestTypeId         String              @db.Uuid
+  title                 String              @db.VarChar(200)
+  description           String              @db.Text
+  departureAt           DateTime?           @db.Timestamptz(3)
+  expectedReturnAt      DateTime?           @db.Timestamptz(3)
+  destination           String?             @db.VarChar(255)
+  status                HostelRequestStatus @default(PENDING_GUARD_REVIEW)
+  guardReviewerId       String?             @db.Uuid
+  guardDecisionAt       DateTime?           @db.Timestamptz(3)
+  guardRemarks          String?             @db.Text
+  adminActorId          String?             @db.Uuid
+  processingStartedAt   DateTime?           @db.Timestamptz(3)
+  completedAt           DateTime?           @db.Timestamptz(3)
+  completionNotes       String?             @db.Text
+  rejectionReason       String?             @db.Text
+  createdAt             DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime            @updatedAt @db.Timestamptz(3)
+
+  student       Student        @relation("RequestStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  requestType   RequestType    @relation(fields: [requestTypeId], references: [id], onDelete: Restrict)
+  guardReviewer User?          @relation("RequestGuardReviewer", fields: [guardReviewerId], references: [id], onDelete: SetNull)
+  adminActor    User?          @relation("RequestAdminActor", fields: [adminActorId], references: [id], onDelete: SetNull)
+  history       RequestHistory[]
+
+  @@index([studentId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestTypeId, status])
+}
+
+model RequestHistory {
+  id          String              @id @default(uuid()) @db.Uuid
+  requestId   String              @db.Uuid
+  previousStatus HostelRequestStatus?
+  newStatus   HostelRequestStatus
+  action      RequestHistoryAction
+  actorId     String              @db.Uuid
+  remarks     String?             @db.Text
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+
+  request HostelRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User          @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+}
+
+model Notification {
+  id             String           @id @default(uuid()) @db.Uuid
+  recipientId    String           @db.Uuid
+  type           NotificationType
+  title          String           @db.VarChar(200)
+  message        String           @db.Text
+  relatedEntityType String?       @db.VarChar(80)
+  relatedEntityId String?         @db.VarChar(80)
+  dedupeKey      String?          @unique @db.VarChar(180)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  readAt         DateTime?         @db.Timestamptz(3)
+
+  recipient User           @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  @@index([recipientId, readAt, createdAt])
+  @@index([relatedEntityType, relatedEntityId])
 }
 
 model Notice {

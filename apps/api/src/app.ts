@@ -20,6 +20,8 @@ import { equipmentRouter } from "./modules/equipment/equipment.routes.js";
 import { noticesRouter } from "./modules/notices/notices.routes.js";
 import { applicationsRouter } from "./modules/applications/applications.routes.js";
 import { auditRouter } from "./modules/audit/audit.routes.js";
+import { requestsRouter } from "./modules/requests/requests.routes.js";
+import { notificationsRouter } from "./modules/notifications/notifications.routes.js";
 
 const PgSession = connectPgSimple(session);
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
@@ -55,6 +57,8 @@ app.use("/api/v1/equipment", equipmentRouter);
 app.use("/api/v1/notices", noticesRouter);
 app.use("/api/v1/applications", applicationsRouter);
 app.use("/api/v1/audit", auditRouter);
+app.use("/api/v1/requests", requestsRouter);
+app.use("/api/v1/notifications", notificationsRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Route not found", code: "NOT_FOUND" }));
 app.use(errorHandler);

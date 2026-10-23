@@ -13,7 +13,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(24),
-  WEB_ORIGIN: z.string().url().default("http://localhost:5173")
+  WEB_ORIGIN: z.string().url().default("http://localhost:5173"),
+  APP_TIMEZONE: z.string().default("Asia/Kolkata")
 });
 
 export const env = envSchema.parse(process.env);
+process.env.TZ = env.APP_TIMEZONE;

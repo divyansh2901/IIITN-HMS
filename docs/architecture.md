@@ -34,6 +34,18 @@ Academic-year floor arrangements are descriptions on floors only. They are not a
 
 Leave requests are separate from gate verification events and separate from Pravesh. The code records approval, departure, and return events but makes no claim about live campus location. `HOSTEL_IN_TIME` is a policy setting seeded to `22:00`; the final hierarchy, emergency rules, late-return policy, and document requirements remain open requirements.
 
+## Request workflow
+
+Generic `HostelRequest` records keep request type, original details, current status, and actor/timestamp metadata. `RequestHistory` is append-only from the application perspective and records every transition. A student can create and view their own requests; a guard can only process `PENDING_GUARD_REVIEW` requests and can only forward or reject; a warden/super administrator can only process forwarded requests and is the only role that can complete them. Conditional `updateMany` status checks inside serializable transactions prevent stale or concurrent decisions from overwriting one another.
+
+The existing `LeaveRequest` model remains available for the earlier leave verification workflow. The new generic request model is the extensible request-management surface and seeds a leave request type without deleting the existing records.
+
+## Equipment and overdue notifications
+
+Equipment issuance and receiving are guard-only operations. An `EquipmentIssue` stores a due date, transaction reference, total quantity, and returned quantity. `EquipmentReturn` stores every return event so partial returns do not overwrite history. Available stock increases only for returned items whose recorded condition makes them available; damaged or unusable returns remain excluded from available quantity.
+
+The API server runs a small in-process scheduler rather than introducing a new infrastructure dependency. It checks due dates every minute, creates one persisted notification per overdue issue, and relies on a unique deduplication key to make repeated runs safe. This is appropriate for the initial single-process modular monolith; a future multi-instance deployment should move this job behind a leader/outbox mechanism.
+
 ## Data-retention decisions
 
 Important records use statuses, timestamps, and restrictive foreign keys instead of deletion. Deactivating a user does not delete allocations, complaints, leave events, equipment issues, or audit history. Nullable actor references in audit records use `ON DELETE SET NULL` only where the historical event can remain meaningful without the account.

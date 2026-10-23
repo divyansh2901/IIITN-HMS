@@ -20,6 +20,27 @@ studentsRouter.get("/me", requireRoles("STUDENT"), async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+studentsRouter.get("/search", requireRoles("GUARD"), async (req, res, next) => {
+  try {
+    const q = String(req.query.q ?? "").trim();
+    const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 10)));
+    if (q.length < 2) { res.json({ students: [] }); return; }
+    const students = await prisma.student.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { enrollmentNumber: { startsWith: q.toUpperCase(), mode: "insensitive" } },
+          { user: { fullName: { contains: q, mode: "insensitive" } } }
+        ]
+      },
+      take: limit,
+      orderBy: [{ enrollmentNumber: "asc" }],
+      select: { id: true, enrollmentNumber: true, branchCode: true, user: { select: { fullName: true } } }
+    });
+    res.json({ students });
+  } catch (error) { next(error); }
+});
+
 studentsRouter.patch("/me", requireRoles("STUDENT"), validate(profileUpdateSchema), async (req, res, next) => {
   try {
     const student = await prisma.student.update({ where: { id: req.authUser!.studentId }, data: { guardianName: req.body.guardianName, guardianPhone: req.body.guardianPhone, user: { update: { phone: req.body.phone } } }, include: { user: { select: { fullName: true, email: true, phone: true } } } });

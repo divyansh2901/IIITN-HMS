@@ -61,6 +61,8 @@ async function main() {
   await prisma.hostelApplication.upsert({ where: { studentId: secondStudent.id }, update: {}, create: { studentId: secondStudent.id } });
   for (const name of ["Cleaning", "Electrical", "Plumbing", "Furniture", "Other"]) await prisma.complaintCategory.upsert({ where: { name }, update: { isActive: true }, create: { name } });
   for (const item of [{ name: "Football", totalQuantity: 10 }, { name: "Badminton Racket", totalQuantity: 12 }, { name: "Table Tennis Paddle", totalQuantity: 8 }]) await prisma.equipment.upsert({ where: { name: item.name }, update: { totalQuantity: item.totalQuantity }, create: { ...item, availableQuantity: item.totalQuantity } });
+  await prisma.requestType.upsert({ where: { code: "LEAVE" }, update: { name: "Leave request", requiresLeaveDetails: true, isActive: true }, create: { code: "LEAVE", name: "Leave request", requiresLeaveDetails: true } });
+  await prisma.requestType.upsert({ where: { code: "HOSTEL_SERVICE" }, update: { name: "Hostel service request", requiresLeaveDetails: false, isActive: true }, create: { code: "HOSTEL_SERVICE", name: "Hostel service request", requiresLeaveDetails: false } });
   await prisma.policySetting.upsert({ where: { key: "HOSTEL_IN_TIME" }, update: { value: "22:00" }, create: { key: "HOSTEL_IN_TIME", value: "22:00", description: "Usual hostel in-time; configurable by authorized administrators." } });
   const notice = await prisma.notice.findFirst({ where: { title: "Welcome to IIITN HMS" } });
   if (!notice) await prisma.notice.create({ data: { title: "Welcome to IIITN HMS", body: "This development environment contains synthetic hostel records. Contact the hostel office for official policies.", isPublished: true, publishedAt: new Date(), authorId: warden.id } });
